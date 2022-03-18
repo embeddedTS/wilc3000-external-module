@@ -12,15 +12,14 @@ Set either (or both) `CONFIG_WILC_SPI` or `CONFIG_WILC_SDIO` to `m` and build as
 To build from kernel source tree as PWD:
 
 ```
-INSTALL_MOD_PATH="/path/to/target/rootfs/" make M=/path/to/wilc3000-external-module modules_install
+# Be sure to set ARCH and CROSS_COMPILE as needed!
+CONFIG_WILC_SPI=m INSTALL_MOD_PATH="/path/to/target/rootfs/" make M=/path/to/wilc3000-external-module modules_install
 ```
 
 
 To build from the root directory of this repository:
 
 ```
-INSTALL_MOD_PATH="/path/to/target/rootfs/" make -C /path/to/kernel/src/dir M=$PWD modules_install
+# Be sure to set ARCH and CROSS_COMPILE as needed!
+CONFIG_WILC_SPI=m INSTALL_MOD_PATH="/path/to/target/rootfs/" make -C /path/to/kernel/src/dir M=$PWD modules_install
 ```
-
-
-To 
