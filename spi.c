@@ -211,6 +211,7 @@ free:
 	return ret;
 }
 
+#if KERNEL_VERSION(5, 17, 0) > LINUX_VERSION_CODE
 static int wilc_bus_remove(struct spi_device *spi)
 {
 	struct wilc *wilc = spi_get_drvdata(spi);
@@ -222,6 +223,18 @@ static int wilc_bus_remove(struct spi_device *spi)
 	wilc_bt_deinit();
 	return 0;
 }
+#else
+static void wilc_bus_remove(struct spi_device *spi)
+{
+	struct wilc *wilc = spi_get_drvdata(spi);
+
+	if (!IS_ERR(wilc->rtc_clk))
+		clk_disable_unprepare(wilc->rtc_clk);
+
+	wilc_netdev_cleanup(wilc);
+	wilc_bt_deinit();
+}
+#endif
 
 static int wilc_spi_suspend(struct device *dev)
 {
