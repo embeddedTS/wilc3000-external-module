@@ -211,7 +211,7 @@ free:
 	return ret;
 }
 
-#if KERNEL_VERSION(5, 17, 0) > LINUX_VERSION_CODE
+#if KERNEL_VERSION(5, 17, 1) > LINUX_VERSION_CODE
 static int wilc_bus_remove(struct spi_device *spi)
 {
 	struct wilc *wilc = spi_get_drvdata(spi);
