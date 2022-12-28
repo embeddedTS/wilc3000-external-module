@@ -1866,6 +1866,14 @@ static int add_station(struct wiphy *wiphy, struct net_device *dev,
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc_priv *priv = &vif->priv;
 	u8 *assoc_bss = priv->assoc_stainfo.sta_associated_bss[params->aid];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	struct link_station_parameters *link_sta_params = &params->link_sta_params;
+	const struct ieee80211_ht_cap *ht_capa = link_sta_params->ht_capa;
+	u8 supported_rates_len = link_sta_params->supported_rates_len;
+#else
+	const struct ieee80211_ht_cap *ht_capa = params->ht_capa;
+	u8 supported_rates_len = params->supported_rates_len;
+#endif
 
 	if (vif->iftype == WILC_AP_MODE || vif->iftype == WILC_GO_MODE) {
 		memcpy(assoc_bss, mac, ETH_ALEN);
@@ -1879,27 +1887,27 @@ static int add_station(struct wiphy *wiphy, struct net_device *dev,
 			   params->aid);
 		PRINT_INFO(vif->ndev, HOSTAPD_DBG,
 			   "Number of supported rates = %d\n",
-			   params->supported_rates_len);
+			   supported_rates_len);
 
 		PRINT_INFO(vif->ndev, CFG80211_DBG, "IS HT supported = %d\n",
-			   (!params->ht_capa) ? false : true);
+			   (!ht_capa) ? false : true);
 
-		if (params->ht_capa) {
+		if (ht_capa) {
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Capability Info = %d\n",
-				   params->ht_capa->cap_info);
+				   ht_capa->cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "AMPDU Params = %d\n",
-				   params->ht_capa->ampdu_params_info);
+				   ht_capa->ampdu_params_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "HT Extended params= %d\n",
-				   params->ht_capa->extended_ht_cap_info);
+				   ht_capa->extended_ht_cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Tx Beamforming Cap= %d\n",
-				   params->ht_capa->tx_BF_cap_info);
+				   ht_capa->tx_BF_cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Antenna selection info = %d\n",
-				   params->ht_capa->antenna_selection_info);
+				   ht_capa->antenna_selection_info);
 		}
 
 		PRINT_INFO(vif->ndev, CFG80211_DBG, "Flag Mask = %d\n",
@@ -1966,6 +1974,14 @@ static int change_station(struct wiphy *wiphy, struct net_device *dev,
 {
 	int ret = 0;
 	struct wilc_vif *vif = netdev_priv(dev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	struct link_station_parameters *link_sta_params = &params->link_sta_params;
+	const struct ieee80211_ht_cap *ht_capa = link_sta_params->ht_capa;
+	u8 supported_rates_len = link_sta_params->supported_rates_len;
+#else
+	const struct ieee80211_ht_cap *ht_capa = params->ht_capa;
+	u8 supported_rates_len = params->supported_rates_len;
+#endif
 
 	PRINT_D(vif->ndev, CFG80211_DBG, "Change station parameters\n");
 
@@ -1976,25 +1992,25 @@ static int change_station(struct wiphy *wiphy, struct net_device *dev,
 			   params->aid);
 		PRINT_INFO(vif->ndev, CFG80211_DBG,
 			   "Number of supported rates = %d\n",
-			   params->supported_rates_len);
+			   supported_rates_len);
 		PRINT_INFO(vif->ndev, CFG80211_DBG, "IS HT supported = %d\n",
-			   (!params->ht_capa) ? false : true);
-		if (params->ht_capa) {
+			   (!ht_capa) ? false : true);
+		if (ht_capa) {
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Capability Info = %d\n",
-				   params->ht_capa->cap_info);
+				   ht_capa->cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "AMPDU Params = %d\n",
-				   params->ht_capa->ampdu_params_info);
+				   ht_capa->ampdu_params_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "HT Extended params= %d\n",
-				   params->ht_capa->extended_ht_cap_info);
+				   ht_capa->extended_ht_cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Tx Beamforming Cap= %d\n",
-				   params->ht_capa->tx_BF_cap_info);
+				   ht_capa->tx_BF_cap_info);
 			PRINT_INFO(vif->ndev, CFG80211_DBG,
 				   "Antenna selection info = %d\n",
-				   params->ht_capa->antenna_selection_info);
+				   ht_capa->antenna_selection_info);
 		}
 		PRINT_INFO(vif->ndev, CFG80211_DBG, "Flag Mask = %d\n",
 			   params->sta_flags_mask);
