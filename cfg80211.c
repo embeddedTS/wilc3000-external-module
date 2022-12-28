@@ -1422,7 +1422,11 @@ static int mgmt_tx(struct wiphy *wiphy,
 	const u8 *vendor_ie;
 	int ret = 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	*cookie = get_random_u32();
+#else
 	*cookie = prandom_u32();
+#endif
 	priv->tx_cookie = *cookie;
 	mgmt = (const struct ieee80211_mgmt *)buf;
 
