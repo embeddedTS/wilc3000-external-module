@@ -2249,6 +2249,16 @@ int wilc_add_station(struct wilc_vif *vif, const u8 *mac,
 	int result;
 	struct host_if_msg *msg;
 	struct add_sta_param *sta_params;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	struct link_station_parameters *link_sta_params = &params->link_sta_params;
+	const struct ieee80211_ht_cap *ht_capa = link_sta_params->ht_capa;
+	u8 supported_rates_len = link_sta_params->supported_rates_len;
+	const u8 *supported_rates = link_sta_params->supported_rates;
+#else
+	const struct ieee80211_ht_cap *ht_capa = params->ht_capa;
+	u8 supported_rates_len = params->supported_rates_len;
+	const u8 *supported_rates = params->supported_rates;
+#endif
 
 	PRINT_INFO(vif->ndev, HOSTINF_DBG,
 		   "Setting adding station message queue params\n");
@@ -2260,20 +2270,20 @@ int wilc_add_station(struct wilc_vif *vif, const u8 *mac,
 	sta_params = &msg->body.add_sta_info;
 	memcpy(sta_params->bssid, mac, ETH_ALEN);
 	sta_params->aid = params->aid;
-	if (!params->ht_capa) {
+	if (!ht_capa) {
 		sta_params->ht_supported = false;
 	} else {
 		sta_params->ht_supported = true;
-		memcpy(&sta_params->ht_capa, params->ht_capa,
+		memcpy(&sta_params->ht_capa, ht_capa,
 		       sizeof(struct ieee80211_ht_cap));
 	}
 	sta_params->flags_mask = params->sta_flags_mask;
 	sta_params->flags_set = params->sta_flags_set;
 
-	sta_params->supported_rates_len = params->supported_rates_len;
-	if (params->supported_rates_len > 0) {
-		sta_params->supported_rates = kmemdup(params->supported_rates,
-					    params->supported_rates_len,
+	sta_params->supported_rates_len = supported_rates_len;
+	if (supported_rates_len > 0) {
+		sta_params->supported_rates = kmemdup(supported_rates,
+					    supported_rates_len,
 					    GFP_KERNEL);
 		if (!sta_params->supported_rates) {
 			kfree(msg);
@@ -2397,6 +2407,16 @@ int wilc_edit_station(struct wilc_vif *vif, const u8 *mac,
 	int result;
 	struct host_if_msg *msg;
 	struct add_sta_param *sta_params;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	struct link_station_parameters *link_sta_params = &params->link_sta_params;
+	const struct ieee80211_ht_cap *ht_capa = link_sta_params->ht_capa;
+	u8 supported_rates_len = link_sta_params->supported_rates_len;
+	const u8 *supported_rates = link_sta_params->supported_rates;
+#else
+	const struct ieee80211_ht_cap *ht_capa = params->ht_capa;
+	u8 supported_rates_len = params->supported_rates_len;
+	const u8 *supported_rates = params->supported_rates;
+#endif
 
 	PRINT_INFO(vif->ndev, HOSTINF_DBG,
 		   "Setting editing station message queue params\n");
@@ -2408,20 +2428,20 @@ int wilc_edit_station(struct wilc_vif *vif, const u8 *mac,
 	sta_params = &msg->body.edit_sta_info;
 	memcpy(sta_params->bssid, mac, ETH_ALEN);
 	sta_params->aid = params->aid;
-	if (!params->ht_capa) {
+	if (!ht_capa) {
 		sta_params->ht_supported = false;
 	} else {
 		sta_params->ht_supported = true;
-		memcpy(&sta_params->ht_capa, params->ht_capa,
+		memcpy(&sta_params->ht_capa, ht_capa,
 		       sizeof(struct ieee80211_ht_cap));
 	}
 	sta_params->flags_mask = params->sta_flags_mask;
 	sta_params->flags_set = params->sta_flags_set;
 
-	sta_params->supported_rates_len = params->supported_rates_len;
-	if (params->supported_rates_len > 0) {
-		sta_params->supported_rates = kmemdup(params->supported_rates,
-					    params->supported_rates_len,
+	sta_params->supported_rates_len = supported_rates_len;
+	if (supported_rates_len > 0) {
+		sta_params->supported_rates = kmemdup(supported_rates,
+					    supported_rates_len,
 					    GFP_KERNEL);
 		if (!sta_params->supported_rates) {
 			kfree(msg);
