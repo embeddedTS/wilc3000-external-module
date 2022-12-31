@@ -899,9 +899,9 @@ static int wilc_mac_open(struct net_device *ndev)
 				vif->idx);
 
 	if (is_valid_ether_addr(ndev->dev_addr))
-		wilc_set_mac_address(vif, ndev->dev_addr);
+		wilc_set_mac_address(vif, (u8 *)ndev->dev_addr);
 	else
-		wilc_get_mac_address(vif, ndev->dev_addr);
+		wilc_get_mac_address(vif, (u8 *)ndev->dev_addr);
 	netdev_dbg(ndev, "Mac address: %pM\n", ndev->dev_addr);
 
 	if (!is_valid_ether_addr(ndev->dev_addr)) {
