@@ -1815,7 +1815,7 @@ static int start_ap(struct wiphy *wiphy, struct net_device *dev,
 	if (ret != 0)
 		netdev_err(dev, "Error in setting channel\n");
 
-	wilc_wlan_set_bssid(dev, dev->dev_addr, WILC_AP_MODE);
+	wilc_wlan_set_bssid(dev, (u8 *)dev->dev_addr, WILC_AP_MODE);
 
 	return wilc_add_beacon(vif, settings->beacon_interval,
 				   settings->dtim_period, &settings->beacon);
