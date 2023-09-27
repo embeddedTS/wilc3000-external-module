@@ -135,7 +135,11 @@ static void wilc_bt_create_device(void)
 	ret = alloc_chrdev_region(&chc_dev_no, 0, 1, "atmel");
 	if (ret < 0)
 		return;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+	chc_dev_class = class_create("atmel");
+#else
 	chc_dev_class = class_create(THIS_MODULE, "atmel");
+#endif
 	if (IS_ERR(chc_dev_class)) {
 		unregister_chrdev_region(chc_dev_no, 1);
 		return;
