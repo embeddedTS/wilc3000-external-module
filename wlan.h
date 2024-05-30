@@ -8,12 +8,7 @@
 #define WILC_WLAN_H
 
 #include <linux/types.h>
-#include <linux/version.h>
-
-#if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
 #include <linux/bitfield.h>
-#endif
-
 
 /********************************************
  *
@@ -249,7 +244,6 @@ static inline bool is_wilc3000(u32 id)
 #define WILC_RX_BUFF_SIZE	(96 * 1024)
 #define WILC_TX_BUFF_SIZE	(64 * 1024)
 
-#define MODALIAS		"WILC_SPI"
 #define GPIO_NUM_CHIP_EN	94
 #define GPIO_NUM_RESET		60
 
@@ -344,8 +338,8 @@ static inline bool is_wilc3000(u32 id)
 #define IS_MANAGMEMENT		0x100
 #define IS_MANAGMEMENT_CALLBACK	0x080
 #define IS_MGMT_STATUS_SUCCES	0x040
+#define IS_MGMT_AUTH_PKT       0x010
 #define IS_MON_PKT		0x020
-#define IS_MGMT_AUTH_PKT	0x010
 
 #define WILC_WID_TYPE		GENMASK(15, 12)
 #define WILC_VMM_ENTRY_FULL_RETRY	1
@@ -428,7 +422,6 @@ struct tx_complete_data {
 	int size;
 	void *buff;
 	struct sk_buff *skb;
-	struct wilc_vif *vif;
 };
 
 struct wilc_cfg_cmd_hdr {
@@ -480,11 +473,7 @@ int wilc_send_config_pkt(struct wilc_vif *vif, u8 mode, struct wid *wids,
 			 u32 count);
 void wilc_bt_init(struct wilc *wilc);
 void wilc_bt_deinit(void);
-#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
 void eap_buff_timeout(struct timer_list *t);
-#else
-void eap_buff_timeout(unsigned long user);
-#endif
 void acquire_bus(struct wilc *wilc, enum bus_acquire acquire, int source);
 void release_bus(struct wilc *wilc, enum bus_release release, int source);
 int wilc_wlan_init(struct net_device *dev);

@@ -680,7 +680,10 @@ enum {
 	WID_LOG_TERMINAL_SWITCH		= 0x00CD,
 	WID_TX_POWER			= 0x00CE,
 	WID_WOWLAN_TRIGGER		= 0X00CF,
-	WID_SET_MFP			= 0x00D0,
+	WID_SET_MFP                     = 0x00D0,
+	WID_USE_PRIORITY_EAPOL		= 0x00D1,
+
+	WID_DEFAULT_MGMT_KEY_ID		= 0x00D2,
 	/*  EMAC Short WID list */
 	/*  RTS Threshold */
 	/*
@@ -770,7 +773,7 @@ enum {
 	WID_REMOVE_KEY			= 0x301E,
 	WID_ASSOC_REQ_INFO		= 0x301F,
 	WID_ASSOC_RES_INFO		= 0x3020,
-	WID_ADD_IGTK			= 0x3022,
+	WID_ADD_IGTK                    = 0x3022,
 	WID_MANUFACTURER		= 0x3026, /* Added for CAPI tool */
 	WID_MODEL_NAME			= 0x3027, /* Added for CAPI tool */
 	WID_MODEL_NUM			= 0x3028, /* Added for CAPI tool */
@@ -814,9 +817,9 @@ enum {
 	WID_ADD_BEACON			= 0x408a,
 
 	WID_SETUP_MULTICAST_FILTER	= 0x408b,
-
 	WID_ANTENNA_SELECTION		= 0x408c,
-	WID_EXTERNAL_AUTH_PARAM	= 0x408d,
+	WID_EXTERNAL_AUTH_PARAM		= 0x408d,
+
 	/* Miscellaneous WIDs */
 	WID_ALL				= 0x7FFE,
 	WID_MAX				= 0xFFFF

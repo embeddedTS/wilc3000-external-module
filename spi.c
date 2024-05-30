@@ -9,9 +9,12 @@
 #include <linux/module.h>
 #include <linux/crc7.h>
 #include <linux/crc-itu-t.h>
+#include <linux/gpio/consumer.h>
 
 #include "netdev.h"
 #include "cfg80211.h"
+
+#define SPI_MODALIAS		"wilc1000_spi"
 
 static bool enable_crc7;	/* protect SPI commands with CRC7 */
 module_param(enable_crc7, bool, 0644);
@@ -37,13 +40,13 @@ MODULE_PARM_DESC(enable_crc16,
  * zero bytes when the SPI bus operates at 48MHz and none when it
  * operates at 1MHz.
  */
-#define WILC_SPI_RSP_HDR_EXTRA_DATA	3
+#define WILC_SPI_RSP_HDR_EXTRA_DATA	4
 
 struct wilc_spi {
+	bool isinit;		/* true if SPI protocol has been configured */
 	bool probing_crc;	/* true if we're probing chip's CRC config */
 	bool crc7_enabled;	/* true if crc7 is currently enabled */
 	bool crc16_enabled;	/* true if crc16 is currently enabled */
-	bool is_init;
 };
 
 static const struct wilc_hif_func wilc_hif_spi;
@@ -69,7 +72,7 @@ static int wilc_spi_reset(struct wilc *wilc);
 #define CMD_RESET				0xcf
 
 #define SPI_RESP_RETRY_COUNT			(10)
-#define SPI_RETRY_COUNT				(10)
+#define SPI_RETRY_MAX_LIMIT			10
 #define SPI_ENABLE_VMM_RETRY_LIMIT		2
 
 /* SPI response fields (section 11.1.2 in ATWILC1000 User Guide): */
@@ -101,8 +104,6 @@ static int wilc_spi_reset(struct wilc *wilc);
  */
 #define DATA_PKT_LOG_SZ				DATA_PKT_LOG_SZ_MAX
 #define DATA_PKT_SZ				(1 << DATA_PKT_LOG_SZ)
-
-#define USE_SPI_DMA				0
 
 #define WILC_SPI_COMMAND_STAT_SUCCESS		0
 #define WILC_GET_RESP_HDR_START(h)		(((h) >> 4) & 0xf)
@@ -180,11 +181,12 @@ static int wilc_bus_probe(struct spi_device *spi)
 	wilc->dt_dev = &spi->dev;
 	wilc->dev_irq_num = spi->irq;
 
-	wilc->rtc_clk = devm_clk_get(&spi->dev, "rtc");
-	if (PTR_ERR_OR_ZERO(wilc->rtc_clk) == -EPROBE_DEFER)
+	wilc->rtc_clk = devm_clk_get_optional(&spi->dev, "rtc");
+	if (IS_ERR(wilc->rtc_clk)) {
+		ret = PTR_ERR(wilc->rtc_clk);
 		goto netdev_cleanup;
-	else if (!IS_ERR(wilc->rtc_clk))
-		clk_prepare_enable(wilc->rtc_clk);
+	}
+	clk_prepare_enable(wilc->rtc_clk);
 
 	ret = wilc_of_parse_power_pins(wilc);
 	if (ret)
@@ -211,16 +213,16 @@ free:
 	return ret;
 }
 
-static int wilc_bus_remove(struct spi_device *spi)
+static void wilc_bus_remove(struct spi_device *spi)
 {
 	struct wilc *wilc = spi_get_drvdata(spi);
+	struct wilc_spi *spi_priv = wilc->bus_data;
 
-	if (!IS_ERR(wilc->rtc_clk))
-		clk_disable_unprepare(wilc->rtc_clk);
-
+	clk_disable_unprepare(wilc->rtc_clk);
 	wilc_netdev_cleanup(wilc);
+	kfree(spi_priv);
+
 	wilc_bt_deinit();
-	return 0;
 }
 
 static int wilc_spi_suspend(struct device *dev)
@@ -289,7 +291,7 @@ static const struct dev_pm_ops wilc_spi_pm_ops = {
 
 static struct spi_driver wilc_spi_driver = {
 	.driver = {
-		.name = MODALIAS,
+		.name = SPI_MODALIAS,
 		.of_match_table = wilc_of_match,
 		.pm = &wilc_spi_pm_ops,
 	},
@@ -299,7 +301,7 @@ static struct spi_driver wilc_spi_driver = {
 };
 module_spi_driver(wilc_spi_driver);
 MODULE_LICENSE("GPL");
-MODULE_VERSION("15.6");
+MODULE_VERSION("16.1");
 
 static int wilc_spi_tx(struct wilc *wilc, u8 *b, u32 len)
 {
@@ -311,14 +313,10 @@ static int wilc_spi_tx(struct wilc *wilc, u8 *b, u32 len)
 		struct spi_transfer tr = {
 			.tx_buf = b,
 			.len = len,
-#if KERNEL_VERSION(5, 5, 0) <= LINUX_VERSION_CODE
 			.delay = {
-			.value = 0,
-			.unit = SPI_DELAY_UNIT_USECS
+				.value = 0,
+				.unit = SPI_DELAY_UNIT_USECS
 			},
-#else
-			.delay_usecs = 0,
-#endif
 		};
 		char *r_buffer = kzalloc(len, GFP_KERNEL);
 
@@ -331,7 +329,6 @@ static int wilc_spi_tx(struct wilc *wilc, u8 *b, u32 len)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
-		msg.is_dma_mapped = USE_SPI_DMA;
 		spi_message_add_tail(&tr, &msg);
 
 		ret = spi_sync(spi, &msg);
@@ -359,14 +356,11 @@ static int wilc_spi_rx(struct wilc *wilc, u8 *rb, u32 rlen)
 		struct spi_transfer tr = {
 			.rx_buf = rb,
 			.len = rlen,
-#if KERNEL_VERSION(5, 5, 0) <= LINUX_VERSION_CODE
-						.delay = {
-						.value = 0,
-						.unit = SPI_DELAY_UNIT_USECS
-						},
-#else
-			.delay_usecs = 0,
-#endif
+			.delay = {
+				.value = 0,
+				.unit = SPI_DELAY_UNIT_USECS
+			},
+
 		};
 		char *t_buffer = kzalloc(rlen, GFP_KERNEL);
 
@@ -378,7 +372,6 @@ static int wilc_spi_rx(struct wilc *wilc, u8 *rb, u32 rlen)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
-		msg.is_dma_mapped = USE_SPI_DMA;
 		spi_message_add_tail(&tr, &msg);
 
 		ret = spi_sync(spi, &msg);
@@ -407,20 +400,16 @@ static int wilc_spi_tx_rx(struct wilc *wilc, u8 *wb, u8 *rb, u32 rlen)
 			.tx_buf = wb,
 			.len = rlen,
 			.bits_per_word = 8,
-#if KERNEL_VERSION(5, 5, 0) <= LINUX_VERSION_CODE
-						.delay = {
-						.value = 0,
-						.unit = SPI_DELAY_UNIT_USECS
-						},
-#else
-			.delay_usecs = 0,
-#endif
+			.delay = {
+				.value = 0,
+				.unit = SPI_DELAY_UNIT_USECS
+			},
+
 		};
 
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
-		msg.is_dma_mapped = USE_SPI_DMA;
 
 		spi_message_add_tail(&tr, &msg);
 		ret = spi_sync(spi, &msg);
@@ -769,10 +758,7 @@ static int wilc_spi_dma_rw(struct wilc *wilc, u8 cmd, u32 adr, u8 *b, u32 sz)
 		int nbytes;
 		u8 rsp;
 
-		if (sz <= DATA_PKT_SZ)
-			nbytes = sz;
-		else
-			nbytes = DATA_PKT_SZ;
+		nbytes = min_t(u32, sz, DATA_PKT_SZ);
 
 		/*
 		 * Data Response header
@@ -877,50 +863,57 @@ static int wilc_spi_special_cmd(struct wilc *wilc, u8 cmd)
 	return 0;
 }
 
+static void wilc_spi_reset_cmd_sequence(struct wilc *wl, u8 attempt, u32 addr)
+{
+	struct spi_device *spi = to_spi_device(wl->dev);
+	struct wilc_spi *spi_priv = wl->bus_data;
+
+	if (!spi_priv->probing_crc)
+		dev_err(&spi->dev, "Reset and retry %d %x\n", attempt, addr);
+
+	usleep_range(1000, 1100);
+	wilc_spi_reset(wl);
+	usleep_range(1000, 1100);
+}
+
 static int wilc_spi_read_reg(struct wilc *wilc, u32 addr, u32 *data)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
-	u8 retry = SPI_RETRY_COUNT;
 	int result;
 	u8 cmd = CMD_SINGLE_READ;
 	u8 clockless = 0;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
-retry:
 	if (addr <= WILC_SPI_CLOCKLESS_ADDR_LIMIT) {
 		/* Clockless register */
 		cmd = CMD_INTERNAL_READ;
 		clockless = 1;
-	} else {
-		cmd = CMD_SINGLE_READ;
-		clockless = 0;
 	}
 
+retry:
 	result = wilc_spi_single_read(wilc, cmd, addr, data, clockless);
 	if (result) {
 		dev_err(&spi->dev, "Failed cmd, read reg (%08x)...\n", addr);
-		goto fail;
+
+		/* retry is not applicable for clockless registers */
+		if (clockless || !retry_limit)
+			return result;
+
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, addr);
+		retry_limit--;
+		goto retry;
 	}
 
 	le32_to_cpus(data);
 
-fail:
-	if (result && !clockless) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		dev_warn(&spi->dev, "Reset and retry %d %x\n", retry, addr);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
-	}
-	return result;
+	return 0;
 }
 
 static int wilc_spi_read(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	int result;
-	u8 retry = SPI_RETRY_COUNT;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
 	if (size <= 4)
 		return -EINVAL;
@@ -929,47 +922,38 @@ retry:
 	result = wilc_spi_dma_rw(wilc, CMD_DMA_EXT_READ, addr, buf, size);
 	if (result) {
 		dev_err(&spi->dev, "Failed cmd, read block (%08x)...\n", addr);
-		goto fail;
+
+		if (!retry_limit)
+			return result;
+
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, addr);
+		retry_limit--;
+		goto retry;
 	}
 
-fail:
-	if (result) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		dev_warn(&spi->dev, "Reset and retry %d %x %d\n", retry, addr,
-			 size);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
-	}
-	return result;
+	return 0;
 }
 
 static int spi_internal_write(struct wilc *wilc, u32 adr, u32 dat)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	int result;
-	u8 retry = SPI_RETRY_COUNT;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
 retry:
 	result = wilc_spi_write_cmd(wilc, CMD_INTERNAL_WRITE, adr, dat, 0);
 	if (result) {
 		dev_err(&spi->dev, "Failed internal write cmd...\n");
-		goto fail;
+
+		if (!retry_limit)
+			return result;
+
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, adr);
+		retry_limit--;
+		goto retry;
 	}
 
-fail:
-	if (result) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		dev_err(&spi->dev, "Reset and retry %d %x\n", retry, adr);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
-	}
-	return result;
+	return 0;
 }
 
 static int spi_internal_read(struct wilc *wilc, u32 adr, u32 *data)
@@ -977,31 +961,25 @@ static int spi_internal_read(struct wilc *wilc, u32 adr, u32 *data)
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	struct wilc_spi *spi_priv = wilc->bus_data;
 	int result;
-	u8 retry = SPI_RETRY_COUNT;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
 retry:
 	result = wilc_spi_single_read(wilc, CMD_INTERNAL_READ, adr, data, 0);
 	if (result) {
 		if (!spi_priv->probing_crc)
 			dev_err(&spi->dev, "Failed internal read cmd...\n");
-		goto fail;
+
+		if (!retry_limit)
+			return result;
+
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, adr);
+		retry_limit--;
+		goto retry;
 	}
 
 	le32_to_cpus(data);
 
-fail:
-	if (result) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		/* ignore while probing with CRC enable and disabled */
-		if (!spi_priv->probing_crc)
-			dev_err(&spi->dev, "Reset and retry %d %x\n", retry, adr);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
-	}
-	return result;
+	return 0;
 }
 
 /********************************************
@@ -1013,39 +991,30 @@ fail:
 static int wilc_spi_write_reg(struct wilc *wilc, u32 addr, u32 data)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
-	u8 retry = SPI_RETRY_COUNT;
 	int result;
 	u8 cmd = CMD_SINGLE_WRITE;
 	u8 clockless = 0;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
-retry:
 	if (addr <= WILC_SPI_CLOCKLESS_ADDR_LIMIT) {
 		/* Clockless register */
 		cmd = CMD_INTERNAL_WRITE;
 		clockless = 1;
-	} else {
-		cmd = CMD_SINGLE_WRITE;
-		clockless = 0;
 	}
 
+retry:
 	result = wilc_spi_write_cmd(wilc, cmd, addr, data, clockless);
 	if (result) {
 		dev_err(&spi->dev, "Failed cmd, write reg (%08x)...\n", addr);
-		goto fail;
-	}
 
-fail:
-	if (result && !clockless) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		dev_err(&spi->dev,
-			"Reset and retry %d %x %d\n", retry, addr, data);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
+		if (clockless || !retry_limit)
+			return result;
+
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, addr);
+		retry_limit--;
+		goto retry;
 	}
-	return result;
+	return 0;
 }
 
 static int spi_data_rsp(struct wilc *wilc, u8 cmd)
@@ -1098,7 +1067,7 @@ static int wilc_spi_write(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	int result;
-	u8 retry = SPI_RETRY_COUNT;
+	u8 retry_limit = SPI_RETRY_MAX_LIMIT;
 
 	/*
 	 * has to be greated than 4
@@ -1127,20 +1096,17 @@ retry:
 	 */
 	result = spi_data_rsp(wilc, CMD_DMA_EXT_WRITE);
 	if (result) {
-		dev_err(&spi->dev, "Failed block data write...\n");
+		dev_err(&spi->dev, "Failed block data rsp...\n");
 		goto fail;
 	}
 
+	return 0;
+
 fail:
-	if (result) {
-		usleep_range(1000, 1100);
-		wilc_spi_reset(wilc);
-		dev_err(&spi->dev,
-			"Reset and retry %d %x %d\n", retry, addr, size);
-		usleep_range(1000, 1100);
-		retry--;
-		if (retry)
-			goto retry;
+	if (result && retry_limit) {
+		wilc_spi_reset_cmd_sequence(wilc, retry_limit, addr);
+		retry_limit--;
+		goto retry;
 	}
 	return result;
 }
@@ -1168,16 +1134,15 @@ static bool wilc_spi_is_init(struct wilc *wilc)
 {
 	struct wilc_spi *spi_priv = wilc->bus_data;
 
-	return spi_priv->is_init;
+	return spi_priv->isinit;
 }
 
 static int wilc_spi_deinit(struct wilc *wilc)
 {
 	struct wilc_spi *spi_priv = wilc->bus_data;
 
-	spi_priv->is_init = false;
+	spi_priv->isinit = false;
 	wilc_wlan_power(wilc, false);
-
 	return 0;
 }
 
@@ -1185,7 +1150,7 @@ static int wilc_spi_clear_init(struct wilc *wilc)
 {
 	struct wilc_spi *spi_priv = wilc->bus_data;
 
-	spi_priv->is_init = false;
+	spi_priv->isinit = false;
 
 	return 0;
 }
@@ -1198,12 +1163,13 @@ static int wilc_spi_init(struct wilc *wilc, bool resume)
 	u32 chipid;
 	int ret, i;
 
-	if (spi_priv->is_init) {
+	if (spi_priv->isinit) {
+		/* Confirm we can read chipid register without error: */
 		ret = wilc_spi_read_reg(wilc, WILC_CHIPID, &chipid);
-		if (ret)
-			dev_err(&spi->dev, "Fail cmd read chip id...\n");
+		if (ret == 0)
+			return 0;
 
-		return ret;
+		dev_err(&spi->dev, "Fail cmd read chip id...\n");
 	}
 
 	/*
@@ -1261,7 +1227,7 @@ static int wilc_spi_init(struct wilc *wilc, bool resume)
 	spi_priv->probing_crc = false;
 
 	/*
-	 * make sure can read back chip id correctly
+	 * make sure can read chip id without protocol error
 	 */
 	ret = wilc_spi_read_reg(wilc, WILC_CHIPID, &chipid);
 	if (ret) {
@@ -1282,7 +1248,7 @@ static int wilc_spi_init(struct wilc *wilc, bool resume)
 		dev_dbg(&spi->dev, "chipid %08x\n", chipid);
 	}
 
-	spi_priv->is_init = true;
+	spi_priv->isinit = true;
 	return 0;
 }
 

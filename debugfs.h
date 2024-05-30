@@ -9,9 +9,6 @@
 
 #include <linux/kern_levels.h>
 #include <linux/version.h>
-#if KERNEL_VERSION(3, 15, 0) > LINUX_VERSION_CODE
-#include <linux/of_irq.h>
-#endif
 
 #define GENERIC_DBG		BIT(0)
 #define HOSTAPD_DBG		BIT(1)
@@ -54,7 +51,4 @@ int wilc_debugfs_init(void);
 void wilc_debugfs_remove(void);
 #endif
 
-#if KERNEL_VERSION(3, 15, 0) > LINUX_VERSION_CODE
-int of_irq_get(struct device_node *dev, int index);
-#endif
 #endif /* WILC_DEBUGFS_H */
