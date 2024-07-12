@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2012 - 2018 Microchip Technology Inc., and its subsidiaries.
+ * Copyright (c) 2012 - 2018 Microchip Technology Inc., and its subsidiaries
  * All rights reserved.
  */
 
@@ -49,7 +49,7 @@ enum host_if_state {
 	HOST_IF_WAITING_CONN_RESP	= 3,
 	HOST_IF_CONNECTED		= 4,
 	HOST_IF_P2P_LISTEN		= 5,
-	HOST_IF_EXTERNAL_AUTH		= 6,
+	HOST_IF_EXTERNAL_AUTH           = 6,
 	HOST_IF_FORCE_32BIT		= 0xFFFFFFFF
 };
 
@@ -166,10 +166,9 @@ signed int wilc_send_buffered_eap(struct wilc_vif *vif,
 int wilc_add_ptk(struct wilc_vif *vif, const u8 *ptk, u8 ptk_key_len,
 		 const u8 *mac_addr, const u8 *rx_mic, const u8 *tx_mic,
 		 u8 mode, u8 cipher_mode, u8 index);
-int wilc_add_igtk(struct wilc_vif *vif,
-		  const u8 *igtk, u8 igtk_key_len,
-		  const u8 *pn, u8 pn_len,
-		  const u8 *mac_addr, u8 mode, u8 index);
+int wilc_add_igtk(struct wilc_vif *vif, const u8 *igtk, u8 igtk_key_len,
+		  const u8 *pn, u8 pn_len, const u8 *mac_addr, u8 mode,
+		  u8 index);
 s32 wilc_get_inactive_time(struct wilc_vif *vif, const u8 *mac,
 			   u32 *out_val);
 int wilc_add_rx_gtk(struct wilc_vif *vif, const u8 *rx_gtk, u8 gtk_key_len,
@@ -219,7 +218,7 @@ int wilc_set_tx_power(struct wilc_vif *vif, u8 tx_power);
 int wilc_get_tx_power(struct wilc_vif *vif, u8 *tx_power);
 void wilc_set_wowlan_trigger(struct wilc_vif *vif, bool enabled);
 int wilc_set_external_auth_param(struct wilc_vif *vif,
-				  struct cfg80211_external_auth_params *param);
+				 struct cfg80211_external_auth_params *param);
 /* 0 select antenna 1 , 2 select antenna mode , 2 allow the firmware to choose
  * the best antenna
  */
@@ -230,7 +229,9 @@ void wilc_network_info_received(struct wilc *wilc, u8 *buffer, u32 length);
 void wilc_gnrl_async_info_received(struct wilc *wilc, u8 *buffer, u32 length);
 void *wilc_parse_join_bss_param(struct cfg80211_bss *bss,
 				struct cfg80211_crypto_settings *crypto);
-void handle_connect_cancel(struct wilc_vif *vif);
+int wilc_set_default_mgmt_key_index(struct wilc_vif *vif, u8 index);
+
+void wilc_handle_disconnect(struct wilc_vif *vif);
 int wilc_of_parse_power_pins(struct wilc *wilc);
 void wilc_wlan_power(struct wilc *wilc, bool on);
 #endif

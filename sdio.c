@@ -25,26 +25,22 @@ enum sdio_host_lock {
 
 static enum sdio_host_lock	sdio_intr_lock = WILC_SDIO_HOST_NO_TAKEN;
 static wait_queue_head_t sdio_intr_waitqueue;
-
 #define SDIO_MODALIAS "wilc_sdio"
-
-#if KERNEL_VERSION(5, 8, 0) >= LINUX_VERSION_CODE
-#define SDIO_VENDOR_ID_MICROCHIP_WILC 0x0296
-#define SDIO_DEVICE_ID_MICROCHIP_WILC1000 0x5347
-#endif
 
 static const struct sdio_device_id wilc_sdio_ids[] = {
 	{ SDIO_DEVICE(SDIO_VENDOR_ID_MICROCHIP_WILC, SDIO_DEVICE_ID_MICROCHIP_WILC1000) },
 	{ },
 };
+MODULE_DEVICE_TABLE(sdio, wilc_sdio_ids);
 
 #define WILC_SDIO_BLOCK_SIZE 512
 
 struct wilc_sdio {
 	bool irq_gpio;
 	u32 block_size;
-	bool is_init;
+	bool isinit;
 	struct wilc *wl;
+	u8 *cmd53_buf;
 };
 
 struct sdio_cmd52 {
@@ -64,6 +60,7 @@ struct sdio_cmd53 {
 	u32 count:		9;
 	u8 *buffer;
 	u32 block_size;
+	bool use_global_buf;
 };
 
 static const struct wilc_hif_func wilc_hif_sdio;
@@ -113,6 +110,8 @@ static int wilc_sdio_cmd53(struct wilc *wilc, struct sdio_cmd53 *cmd)
 {
 	struct sdio_func *func = container_of(wilc->dev, struct sdio_func, dev);
 	int size, ret;
+	struct wilc_sdio *sdio_priv = wilc->bus_data;
+	u8 *buf = cmd->buffer;
 
 	sdio_claim_host(func);
 
@@ -123,12 +122,23 @@ static int wilc_sdio_cmd53(struct wilc *wilc, struct sdio_cmd53 *cmd)
 	else
 		size = cmd->count;
 
+	if (cmd->use_global_buf) {
+		if (size > sizeof(u32))
+			return -EINVAL;
+
+		buf = sdio_priv->cmd53_buf;
+	}
+
 	if (cmd->read_write) {  /* write */
-		ret = sdio_memcpy_toio(func, cmd->address,
-				       (void *)cmd->buffer, size);
+		if (cmd->use_global_buf)
+			memcpy(buf, cmd->buffer, size);
+
+		ret = sdio_memcpy_toio(func, cmd->address, buf, size);
 	} else {        /* read */
-		ret = sdio_memcpy_fromio(func, (void *)cmd->buffer,
-					 cmd->address,  size);
+		ret = sdio_memcpy_fromio(func, buf, cmd->address, size);
+
+		if (cmd->use_global_buf)
+			memcpy(cmd->buffer, buf, size);
 	}
 
 	sdio_release_host(func);
@@ -153,11 +163,17 @@ static int wilc_sdio_probe(struct sdio_func *func,
 	if (!sdio_priv)
 		return -ENOMEM;
 
+	sdio_priv->cmd53_buf = kzalloc(sizeof(u32), GFP_KERNEL);
+	if (!sdio_priv->cmd53_buf) {
+		ret = -ENOMEM;
+		goto free;
+	}
+
 	if (IS_ENABLED(CONFIG_WILC_HW_OOB_INTR))
 		io_type = WILC_HIF_SDIO_GPIO_IRQ;
 	else
 		io_type = WILC_HIF_SDIO;
-	dev_dbg(&func->dev, "Initializing netdev\n");
+
 	ret = wilc_cfg80211_init(&wilc, &func->dev, io_type, &wilc_hif_sdio);
 	if (ret) {
 		dev_err(&func->dev, "Couldn't initialize netdev\n");
@@ -173,13 +189,12 @@ static int wilc_sdio_probe(struct sdio_func *func,
 	if (irq_num > 0)
 		wilc->dev_irq_num = irq_num;
 
-	wilc->rtc_clk = devm_clk_get(&func->card->dev, "rtc");
-	if (PTR_ERR_OR_ZERO(wilc->rtc_clk) == -EPROBE_DEFER) {
-		ret = -EPROBE_DEFER;
+	wilc->rtc_clk = devm_clk_get_optional(&func->card->dev, "rtc");
+	if (IS_ERR(wilc->rtc_clk)) {
+		ret = PTR_ERR(wilc->rtc_clk);
 		goto dispose_irq;
-	} else if (!IS_ERR(wilc->rtc_clk)) {
-		clk_prepare_enable(wilc->rtc_clk);
 	}
+	clk_prepare_enable(wilc->rtc_clk);
 
 	/*
 	 * Some WILC SDIO setups needs a SD power sequence driver to be able
@@ -197,6 +212,7 @@ static int wilc_sdio_probe(struct sdio_func *func,
 		if (ret)
 			goto disable_rtc_clk;
 	}
+
 
 	if (!init_power) {
 		wilc_wlan_power(wilc, false);
@@ -216,6 +232,7 @@ dispose_irq:
 	irq_dispose_mapping(wilc->dev_irq_num);
 	wilc_netdev_cleanup(wilc);
 free:
+	kfree(sdio_priv->cmd53_buf);
 	kfree(sdio_priv);
 	return ret;
 }
@@ -223,11 +240,12 @@ free:
 static void wilc_sdio_remove(struct sdio_func *func)
 {
 	struct wilc *wilc = sdio_get_drvdata(func);
+	struct wilc_sdio *sdio_priv = wilc->bus_data;
 
-	if (!IS_ERR(wilc->rtc_clk))
-		clk_disable_unprepare(wilc->rtc_clk);
-
+	clk_disable_unprepare(wilc->rtc_clk);
 	wilc_netdev_cleanup(wilc);
+	kfree(sdio_priv->cmd53_buf);
+	kfree(sdio_priv);
 	wilc_bt_deinit();
 }
 
@@ -256,14 +274,14 @@ static bool wilc_sdio_is_init(struct wilc *wilc)
 {
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
 
-	return sdio_priv->is_init;
+	return sdio_priv->isinit;
 }
 
 static int wilc_sdio_clear_init(struct wilc *wilc)
 {
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
 
-	sdio_priv->is_init = false;
+	sdio_priv->isinit = false;
 
 	return 0;
 }
@@ -449,8 +467,9 @@ static int wilc_sdio_write_reg(struct wilc *wilc, u32 addr, u32 data)
 		cmd.address = WILC_SDIO_FBR_DATA_REG;
 		cmd.block_mode = 0;
 		cmd.increment = 1;
-		cmd.count = 4;
+		cmd.count = sizeof(u32);
 		cmd.buffer = (u8 *)&data;
+		cmd.use_global_buf = true;
 		cmd.block_size = sdio_priv->block_size;
 		ret = wilc_sdio_cmd53(wilc, &cmd);
 		if (ret)
@@ -488,6 +507,7 @@ static int wilc_sdio_write(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 	nblk = size / block_size;
 	nleft = size % block_size;
 
+	cmd.use_global_buf = false;
 	if (nblk > 0) {
 		cmd.block_mode = 1;
 		cmd.increment = 1;
@@ -566,8 +586,9 @@ static int wilc_sdio_read_reg(struct wilc *wilc, u32 addr, u32 *data)
 		cmd.address = WILC_SDIO_FBR_DATA_REG;
 		cmd.block_mode = 0;
 		cmd.increment = 1;
-		cmd.count = 4;
+		cmd.count = sizeof(u32);
 		cmd.buffer = (u8 *)data;
+		cmd.use_global_buf = true;
 
 		cmd.block_size = sdio_priv->block_size;
 		ret = wilc_sdio_cmd53(wilc, &cmd);
@@ -609,6 +630,7 @@ static int wilc_sdio_read(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 	nblk = size / block_size;
 	nleft = size % block_size;
 
+	cmd.use_global_buf = false;
 	if (nblk > 0) {
 		cmd.block_mode = 1;
 		cmd.increment = 1;
@@ -666,7 +688,7 @@ static int wilc_sdio_deinit(struct wilc *wilc)
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
 
-	sdio_priv->is_init = false;
+	sdio_priv->isinit = false;
 
 	pm_runtime_put_sync_autosuspend(mmc_dev(func->card->host));
 	wilc_wlan_power(wilc, false);
@@ -798,7 +820,7 @@ static int wilc_sdio_init(struct wilc *wilc, bool resume)
 		dev_info(&func->dev, "chipid %08x\n", chipid);
 	}
 
-	sdio_priv->is_init = true;
+	sdio_priv->isinit = true;
 
 	return 0;
 
@@ -1133,4 +1155,4 @@ module_driver(wilc_sdio_driver,
 	      sdio_register_driver,
 	      sdio_unregister_driver);
 MODULE_LICENSE("GPL");
-MODULE_VERSION("15.6");
+MODULE_VERSION("16.1");

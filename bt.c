@@ -99,7 +99,7 @@ static ssize_t wilc_bt_dev_write(struct file *f, const char __user *buff,
 
 
 	if (len == 0) {
-		pr_debug("received invalid size <=0: %d\n", len);
+		pr_debug("received invalid size <=0: %zu\n", len);
 		return len;
 	}
 
@@ -108,12 +108,12 @@ static ssize_t wilc_bt_dev_write(struct file *f, const char __user *buff,
 	if (copy_from_user(usr_str, buff, len))
 		return -EIO;
 
-	pr_debug("received %s, len %d\n", usr_str, len);
+	pr_debug("received %s, len %zu\n", usr_str, len);
 	/* call the appropriate command handler */
 	cmd = (struct cmd_entry *)cmd_table;
 	while (cmd->wilc_handle_cmd != NULL) {
 		if (strncmp(cmd->str, usr_str, strlen(cmd->str)) == 0) {
-			pr_debug("param len: %d, string: %s\n",
+			pr_debug("param len: %zu, string: %s\n",
 				 len - strlen(cmd->str), usr_str);
 			cmd->wilc_handle_cmd(usr_str + strlen(cmd->str));
 			break;
@@ -135,7 +135,7 @@ static void wilc_bt_create_device(void)
 	ret = alloc_chrdev_region(&chc_dev_no, 0, 1, "atmel");
 	if (ret < 0)
 		return;
-	chc_dev_class = class_create(THIS_MODULE, "atmel");
+	chc_dev_class = class_create("atmel");
 	if (IS_ERR(chc_dev_class)) {
 		unregister_chrdev_region(chc_dev_no, 1);
 		return;
@@ -551,7 +551,7 @@ static void wilc_bt_firmware_download(struct wilc *wilc)
 		pr_err("Can't allocate buffer for BT firmware download IO error\n");
 		goto fail_1;
 	}
-	pr_info("Downloading BT firmware size = %d ...\n", buffer_size);
+	pr_info("Downloading BT firmware size = %zu ...\n", buffer_size);
 
 	offset = 0;
 	addr = 0x400000;
@@ -685,8 +685,7 @@ void wilc_bt_deinit(void)
 {
 	pr_info("at_pwr_dev: deinit\n");
 
-	if (&wilc_bt->cs != NULL)
-		mutex_destroy(&wilc_bt->cs);
+	mutex_destroy(&wilc_bt->cs);
 
 	cdev_del(&str_chc_dev);
 	device_created = 0;

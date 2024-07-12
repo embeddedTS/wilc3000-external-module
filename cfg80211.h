@@ -18,14 +18,9 @@ void wilc_wfi_deinit_mon_interface(struct wilc *wl, bool rtnl_locked);
 struct net_device *wilc_wfi_init_mon_interface(struct wilc *wl,
 					       const char *name,
 					       struct net_device *real_dev);
-#if KERNEL_VERSION(5, 8, 0) <= LINUX_VERSION_CODE
 void wilc_update_mgmt_frame_registrations(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
 					  struct mgmt_frame_regs *upd);
-#else
-void wilc_mgmt_frame_register(struct wiphy *wiphy, struct wireless_dev *wdev,
-			      u16 frame_type, bool reg);
-#endif
 void wilc_sysfs_init(struct wilc *wilc);
 void wilc_sysfs_exit(void);
 struct wilc_vif *wilc_get_vif_from_type(struct wilc *wl, int type);

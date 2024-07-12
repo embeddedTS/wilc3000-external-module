@@ -20,129 +20,6 @@
 
 extern int wait_for_recovery;
 
-#if KERNEL_VERSION(3, 14, 0) > LINUX_VERSION_CODE
-static inline void ether_addr_copy(u8 *dst, const u8 *src)
-{
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
-	*(u32 *)dst = *(const u32 *)src;
-	*(u16 *)(dst + 4) = *(const u16 *)(src + 4);
-#else
-	u16 *a = (u16 *)dst;
-	const u16 *b = (const u16 *)src;
-
-	a[0] = b[0];
-	a[1] = b[1];
-	a[2] = b[2];
-#endif
-}
-
-static inline bool ether_addr_equal_unaligned(const u8 *addr1, const u8 *addr2)
-{
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
-	return ether_addr_equal(addr1, addr2);
-#else
-	return memcmp(addr1, addr2, ETH_ALEN) == 0;
-#endif
-}
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) */
-
-#if KERNEL_VERSION(3, 12, 0) > LINUX_VERSION_CODE
-#define PTR_ERR_OR_ZERO(ptr) PTR_RET(ptr)
-#endif
-
-#if KERNEL_VERSION(3, 13, 0) > LINUX_VERSION_CODE
-/*
- * Create a contiguous bitmask starting at bit position @l and ending at
- * position @h. For example
- * GENMASK_ULL(39, 21) gives us the 64bit vector 0x000000ffffe00000.
- */
-#define GENMASK(h, l) \
-	(((~UL(0)) - (UL(1) << (l)) + 1) & \
-	 (~UL(0) >> (BITS_PER_LONG - 1 - (h))))
-#endif
-
-#if KERNEL_VERSION(4, 9, 0) > LINUX_VERSION_CODE
-#ifdef __CHECKER__
-#define __BUILD_BUG_ON_NOT_POWER_OF_2(n) (0)
-#else
-/* Force a compilation error if a constant expression is not a power of 2 */
-#define __BUILD_BUG_ON_NOT_POWER_OF_2(n)	\
-	BUILD_BUG_ON(((n) & ((n) - 1)) != 0)
-#endif
-
-/*
- * Bitfield access macros
- *
- * FIELD_{GET,PREP} macros take as first parameter shifted mask
- * from which they extract the base mask and shift amount.
- * Mask must be a compilation time constant.
- *
- * Example:
- *
- *  #define REG_FIELD_A  GENMASK(6, 0)
- *  #define REG_FIELD_B  BIT(7)
- *  #define REG_FIELD_C  GENMASK(15, 8)
- *  #define REG_FIELD_D  GENMASK(31, 16)
- *
- * Get:
- *  a = FIELD_GET(REG_FIELD_A, reg);
- *  b = FIELD_GET(REG_FIELD_B, reg);
- *
- * Set:
- *  reg = FIELD_PREP(REG_FIELD_A, 1) |
- *	  FIELD_PREP(REG_FIELD_B, 0) |
- *	  FIELD_PREP(REG_FIELD_C, c) |
- *	  FIELD_PREP(REG_FIELD_D, 0x40);
- *
- * Modify:
- *  reg &= ~REG_FIELD_C;
- *  reg |= FIELD_PREP(REG_FIELD_C, c);
- */
-
-#define __bf_shf(x) (__builtin_ffsll(x) - 1)
-
-#define __BF_FIELD_CHECK(_mask, _reg, _val, _pfx)			\
-	({								\
-		BUILD_BUG_ON_MSG(!__builtin_constant_p(_mask),		\
-				 _pfx "mask is not constant");		\
-		BUILD_BUG_ON_MSG(!(_mask), _pfx "mask is zero");	\
-		BUILD_BUG_ON_MSG(__builtin_constant_p(_val) ?		\
-				 ~((_mask) >> __bf_shf(_mask)) & (_val) : 0, \
-				 _pfx "value too large for the field"); \
-		BUILD_BUG_ON_MSG((_mask) > (typeof(_reg))~0ull,		\
-				 _pfx "type of reg too small for mask"); \
-		__BUILD_BUG_ON_NOT_POWER_OF_2((_mask) +			\
-					      (1ULL << __bf_shf(_mask))); \
-	})
-/**
- * FIELD_GET() - extract a bitfield element
- * @_mask: shifted mask defining the field's length and position
- * @_reg:  32bit value of entire bitfield
- *
- * FIELD_GET() extracts the field specified by @_mask from the
- * bitfield passed in as @_reg by masking and shifting it down.
- */
-#define FIELD_GET(_mask, _reg)						\
-	({								\
-		__BF_FIELD_CHECK(_mask, _reg, 0U, "FIELD_GET: ");	\
-		(typeof(_mask))(((_reg) & (_mask)) >> __bf_shf(_mask));	\
-	})
-
-/**
- * FIELD_PREP() - prepare a bitfield element
- * @_mask: shifted mask defining the field's length and position
- * @_val:  value to put in the field
- *
- * FIELD_PREP() masks and shifts up the value.  The result should
- * be combined with other fields of the bitfield using logical OR.
- */
-#define FIELD_PREP(_mask, _val)						\
-	({								\
-		__BF_FIELD_CHECK(_mask, 0ULL, _val, "FIELD_PREP: ");	\
-		((typeof(_mask))(_val) << __bf_shf(_mask)) & (_mask);	\
-	})
-#endif
-
 #define FLOW_CONTROL_LOWER_THRESHOLD		128
 #define FLOW_CONTROL_UPPER_THRESHOLD		256
 
@@ -204,25 +81,14 @@ static const u32 wilc_cipher_suites[] = {
 	WLAN_CIPHER_SUITE_AES_CMAC
 };
 
-#if KERNEL_VERSION(4, 7, 0) > LINUX_VERSION_CODE
-#define CHAN2G(_channel, _freq, _flags) {       \
-	.band             = IEEE80211_BAND_2GHZ, \
-	.center_freq      = (_freq),             \
-	.hw_value         = (_channel),          \
-	.flags            = (_flags),            \
-	.max_antenna_gain = 0,                   \
-	.max_power        = 30,                  \
-}
-#else
-#define CHAN2G(_channel, _freq, _flags) {       \
+#define CHAN2G(_channel, _freq, _flags) {	 \
 	.band             = NL80211_BAND_2GHZ, \
-	.center_freq      = (_freq),             \
-	.hw_value         = (_channel),          \
-	.flags            = (_flags),            \
-	.max_antenna_gain = 0,                   \
-	.max_power        = 30,                  \
+	.center_freq      = (_freq),		 \
+	.hw_value         = (_channel),		 \
+	.flags            = (_flags),		 \
+	.max_antenna_gain = 0,			 \
+	.max_power        = 30,			 \
 }
-#endif
 
 static const struct ieee80211_channel wilc_2ghz_channels[] = {
 	CHAN2G(1,  2412, 0),
@@ -296,15 +162,6 @@ struct wilc_priv {
 	u64 inc_roc_cookie;
 };
 
-#if KERNEL_VERSION(5, 8, 0) > LINUX_VERSION_CODE
-struct frame_reg {
-	u16 type;
-	bool reg;
-};
-
-#define NUM_REG_FRAME				3
-#endif
-
 #define MAX_TCP_SESSION                25
 #define MAX_PENDING_ACKS               256
 
@@ -346,11 +203,7 @@ struct wilc_vif {
 	u8 iftype;
 	int monitor_flag;
 	int mac_opened;
-#if KERNEL_VERSION(5, 8, 0) <= LINUX_VERSION_CODE
 	u32 mgmt_reg_stypes;
-#else
-	struct frame_reg frame_reg[NUM_REG_FRAME];
-#endif
 	struct net_device_stats netstats;
 	struct wilc *wilc;
 	u8 bssid[ETH_ALEN];
@@ -390,11 +243,11 @@ struct wilc_tx_queue_status {
 struct wilc {
 	struct wiphy *wiphy;
 	const struct wilc_hif_func *hif_func;
-	u32 chipid;
 	int io_type;
 	s8 mac_status;
 	struct clk *rtc_clk;
 	bool initialized;
+	u32 chipid;
 	int dev_irq_num;
 	int close;
 	u8 vif_num;
@@ -436,6 +289,7 @@ struct wilc {
 	u8 *rx_buffer;
 	u32 rx_buffer_offset;
 	u8 *tx_buffer;
+	u32 vmm_table[WILC_VMM_TBL_SIZE];
 
 	struct txq_handle txq[NQUEUES];
 	int txq_entries;
@@ -477,7 +331,8 @@ void wilc_frmw_to_host(struct wilc_vif *vif, u8 *buff, u32 size,
 void wilc_mac_indicate(struct wilc *wilc);
 void wilc_netdev_cleanup(struct wilc *wilc);
 void wilc_wfi_mgmt_rx(struct wilc *wilc, u8 *buff, u32 size, bool is_auth);
-void wilc_wlan_set_bssid(struct net_device *wilc_netdev, u8 *bssid, u8 mode);
+void wilc_wlan_set_bssid(struct net_device *wilc_netdev, const u8 *bssid,
+			 u8 mode);
 struct wilc_vif *wilc_netdev_ifc_init(struct wilc *wl, const char *name,
 				      int vif_type, enum nl80211_iftype type,
 				      bool rtnl_locked);

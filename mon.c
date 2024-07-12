@@ -39,13 +39,8 @@ void wilc_wfi_handle_monitor_rx(struct wilc *wilc, u8 *buff, u32 size)
 			"Monitor if: No memory to allocate skb");
 		return;
 	}
-#if KERNEL_VERSION(4, 13, 0) <= LINUX_VERSION_CODE
 	skb_put_data(skb, buff, size);
 	hdr = skb_push(skb, sizeof(*hdr));
-#else
-	memcpy(skb_put(skb, size), buff, size);
-	hdr = (struct wilc_wfi_radiotap_hdr *)skb_push(skb, sizeof(*hdr));
-#endif
 	memset(hdr, 0, sizeof(*hdr));
 	hdr->hdr.it_version = 0; /* PKTHDR_RADIOTAP_VERSION; */
 	hdr->hdr.it_len = cpu_to_le16(sizeof(*hdr));
@@ -98,15 +93,9 @@ void wilc_wfi_monitor_rx(struct net_device *mon_dev, u8 *buff, u32 size)
 				"Monitor if : No memory to allocate skb");
 			return;
 		}
-	#if KERNEL_VERSION(4, 13, 0) <= LINUX_VERSION_CODE
 		skb_put_data(skb, buff, size);
 
 		cb_hdr = skb_push(skb, sizeof(*cb_hdr));
-	#else
-		memcpy(skb_put(skb, size), buff, size);
-		cb_hdr = (struct wilc_wfi_radiotap_cb_hdr *)skb_push(skb,
-							    sizeof(*cb_hdr));
-	#endif
 		memset(cb_hdr, 0, sizeof(*cb_hdr));
 
 		cb_hdr->hdr.it_version = 0; /* PKTHDR_RADIOTAP_VERSION; */
@@ -127,19 +116,11 @@ void wilc_wfi_monitor_rx(struct net_device *mon_dev, u8 *buff, u32 size)
 	} else {
 		skb = dev_alloc_skb(size + sizeof(*hdr));
 
-		if (!skb) {
-			PRINT_D(mon_dev, HOSTAPD_DBG,
-				"Monitor if : No memory to allocate skb");
+		if (!skb)
 			return;
-		}
-	#if KERNEL_VERSION(4, 13, 0) <= LINUX_VERSION_CODE
+
 		skb_put_data(skb, buff, size);
 		hdr = skb_push(skb, sizeof(*hdr));
-	#else
-		memcpy(skb_put(skb, size), buff, size);
-		hdr = (struct wilc_wfi_radiotap_hdr *)skb_push(skb,
-							       sizeof(*hdr));
-	#endif
 		memset(hdr, 0, sizeof(*hdr));
 		hdr->hdr.it_version = 0; /* PKTHDR_RADIOTAP_VERSION; */
 		hdr->hdr.it_len = cpu_to_le16(sizeof(*hdr));
@@ -257,7 +238,7 @@ static netdev_tx_t wilc_wfi_mon_xmit(struct sk_buff *skb,
 	if (!(memcmp(srcadd, bssid, 6))) {
 		ret = mon_mgmt_tx(mon_priv->real_ndev, skb->data, skb->len);
 		if (ret)
-			PRINT_ER(dev, "fail to mgmt tx\n");
+			netdev_err(dev, "fail to mgmt tx\n");
 		dev_kfree_skb(skb);
 	} else {
 		ret = wilc_mac_xmit(skb, mon_priv->real_ndev);
@@ -287,15 +268,12 @@ struct net_device *wilc_wfi_init_mon_interface(struct wilc *wl,
 		return NULL;
 	}
 	wl->monitor_dev->type = ARPHRD_IEEE80211_RADIOTAP;
-	strlcpy(wl->monitor_dev->name, name, IFNAMSIZ);
+	strscpy(wl->monitor_dev->name, name, IFNAMSIZ);
 	wl->monitor_dev->netdev_ops = &wilc_wfi_netdev_ops;
-#if KERNEL_VERSION(4, 11, 9) <= LINUX_VERSION_CODE
 	wl->monitor_dev->needs_free_netdev = true;
-#else
-	wl->monitor_dev->destructor = free_netdev;
-#endif
+
 	if (register_netdevice(wl->monitor_dev)) {
-		PRINT_ER(real_dev, "register_netdevice failed\n");
+		netdev_err(real_dev, "register_netdevice failed\n");
 		free_netdev(wl->monitor_dev);
 		return NULL;
 	}

@@ -3,14 +3,12 @@
  * Copyright (c) 2012 - 2018 Microchip Technology Inc., and its subsidiaries.
  * All rights reserved.
  */
+
+#include <linux/bitfield.h>
 #include "wlan_if.h"
 #include "wlan.h"
 #include "wlan_cfg.h"
 #include "netdev.h"
-
-#if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
-#include <linux/bitfield.h>
-#endif
 
 enum cfg_cmd_type {
 	CFG_BYTE_CMD	= 0,
@@ -189,9 +187,9 @@ static void wilc_wlan_parse_response_frame(struct wilc *wl, u8 *info, int size)
 
 			if (cfg->s[i].id == wid)
 				memcpy(cfg->s[i].str, &info[2],
-				       (2 + ((info[3] << 8) | info[2])));
+				       get_unaligned_le16(&info[2]) + 2);
 
-			len = 2 + ((info[3] << 8) | info[2]);
+			len = 2 + get_unaligned_le16(&info[2]);
 			break;
 		case WID_BIN_DATA:
 			while (cfg->bin[i].id != WID_NIL &&
@@ -291,8 +289,6 @@ int wilc_wlan_cfg_set_wid(u8 *frame, u32 offset, u16 id, u8 *buf, int size)
 	case CFG_BIN_CMD:
 		ret = wilc_wlan_cfg_set_bin(frame, offset, id, buf, size);
 		break;
-	default:
-		pr_err("%s illegal type[%d] wid[%d]\n", __func__, type, id);
 	}
 
 	return ret;
@@ -368,7 +364,6 @@ int wilc_wlan_cfg_get_val(struct wilc *wl, u16 wid, u8 *buffer,
 	} else {
 		pr_err("[CFG]: illegal type (%08x)\n", wid);
 	}
-
 	return ret;
 }
 
@@ -396,7 +391,6 @@ void wilc_wlan_cfg_indicate_rx(struct wilc *wilc, u8 *frame, int size,
 		rsp->type = WILC_CFG_RSP_STATUS;
 		rsp->seq_no = msg_id;
 		/* call host interface info parse as well */
-		pr_info("%s: Info message received\n", __func__);
 		wilc_gnrl_async_info_received(wilc, frame - 4, size + 4);
 		break;
 
@@ -405,14 +399,10 @@ void wilc_wlan_cfg_indicate_rx(struct wilc *wilc, u8 *frame, int size,
 		break;
 
 	case WILC_RESP_MSG_TYPE_SCAN_COMPLETE:
-		pr_info("%s: Scan Notification Received\n", __func__);
 		wilc_scan_complete_received(wilc, frame - 4, size + 4);
 		break;
 
 	default:
-		pr_err("%s: Receive unknown message %d-%d-%d-%d-%d-%d-%d-%d\n",
-		       __func__, frame[0], frame[1], frame[2], frame[3],
-		       frame[4], frame[5], frame[6], frame[7]);
 		rsp->seq_no = msg_id;
 		break;
 	}
