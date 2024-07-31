@@ -1687,6 +1687,17 @@ static int start_ap(struct wiphy *wiphy, struct net_device *dev,
 				   settings->dtim_period, &settings->beacon);
 }
 
+#if KERNEL_VERSION(6, 7, 0) <= LINUX_VERSION_CODE
+static int change_beacon(struct wiphy *wiphy, struct net_device *dev,
+			 struct cfg80211_ap_update *ap_update)
+{
+	struct wilc_vif *vif = netdev_priv(dev);
+
+	PRINT_INFO(vif->ndev, HOSTAPD_DBG, "Setting beacon\n");
+
+	return wilc_add_beacon(vif, 0, 0, &ap_update->beacon);
+}
+#else // Kernels 6.5~6.6
 static int change_beacon(struct wiphy *wiphy, struct net_device *dev,
 			 struct cfg80211_beacon_data *beacon)
 {
@@ -1696,6 +1707,7 @@ static int change_beacon(struct wiphy *wiphy, struct net_device *dev,
 
 	return wilc_add_beacon(vif, 0, 0, beacon);
 }
+#endif
 
 static int stop_ap(struct wiphy *wiphy, struct net_device *dev,
 		   unsigned int link_id)
