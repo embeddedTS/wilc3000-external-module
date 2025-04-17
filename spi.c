@@ -338,7 +338,9 @@ static int wilc_spi_tx(struct wilc *wilc, u8 *b, u32 len)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
+#if KERNEL_VERSION(6, 10, 0) > LINUX_VERSION_CODE
 		msg.is_dma_mapped = USE_SPI_DMA;
+#endif
 		spi_message_add_tail(&tr, &msg);
 
 		ret = spi_sync(spi, &msg);
@@ -385,7 +387,9 @@ static int wilc_spi_rx(struct wilc *wilc, u8 *rb, u32 rlen)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
+#if KERNEL_VERSION(6, 10, 0) > LINUX_VERSION_CODE
 		msg.is_dma_mapped = USE_SPI_DMA;
+#endif
 		spi_message_add_tail(&tr, &msg);
 
 		ret = spi_sync(spi, &msg);
@@ -427,7 +431,9 @@ static int wilc_spi_tx_rx(struct wilc *wilc, u8 *wb, u8 *rb, u32 rlen)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 		msg.spi = spi;
+#if KERNEL_VERSION(6, 10, 0) > LINUX_VERSION_CODE
 		msg.is_dma_mapped = USE_SPI_DMA;
+#endif
 
 		spi_message_add_tail(&tr, &msg);
 		ret = spi_sync(spi, &msg);
