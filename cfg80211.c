@@ -291,6 +291,9 @@ struct wilc_vif *wilc_get_wl_to_vif(struct wilc *wl)
 }
 
 static int set_channel(struct wiphy *wiphy,
+#if KERNEL_VERSION(6, 13, 0) <= LINUX_VERSION_CODE
+		       struct net_device *netdev,
+#endif
 		       struct cfg80211_chan_def *chandef)
 {
 	struct wilc *wl = wiphy_priv(wiphy);
