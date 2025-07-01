@@ -13,6 +13,19 @@
 #include <net/ieee80211_radiotap.h>
 #include <linux/if_arp.h>
 #include <linux/gpio/consumer.h>
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
+static inline int del_timer_sync(struct timer_list *timer)
+{
+	return timer_delete_sync(timer);
+}
+
+static inline int del_timer(struct timer_list *timer)
+{
+	return timer_delete(timer);
+}
+#endif
 
 #include "hif.h"
 #include "wlan.h"
