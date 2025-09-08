@@ -15,6 +15,10 @@
 #include <linux/gpio/consumer.h>
 #include <linux/version.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
+#define from_timer	timer_container_of
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
 static inline int del_timer_sync(struct timer_list *timer)
 {
