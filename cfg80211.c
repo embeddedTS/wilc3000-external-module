@@ -997,7 +997,11 @@ static int change_bss(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
+#else
 static int set_wiphy_params(struct wiphy *wiphy, u32 changed)
+#endif
 {
 	int ret = -EINVAL;
 	struct cfg_param_attr cfg_param_val;
@@ -2198,6 +2202,9 @@ static void wilc_set_wakeup(struct wiphy *wiphy, bool enabled)
 }
 
 static int set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+			int radio_idx,
+#endif
 			enum nl80211_tx_power_setting type, int mbm)
 {
 	int ret;
@@ -2230,6 +2237,9 @@ static int set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 }
 
 static int get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+	int radio_idx,
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0))
 			unsigned int link_id,
 #endif
@@ -2252,7 +2262,12 @@ static int get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+static int set_antenna(struct wiphy *wiphy, int radio_idx, u32 tx_ant,
+		       u32 rx_ant)
+#else
 static int set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
+#endif
 {
 	int ret;
 	struct wilc *wl = wiphy_priv(wiphy);
