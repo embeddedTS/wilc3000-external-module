@@ -1,4 +1,4 @@
-#include <linux/delay.h>
+#include <linux/delay.h>OA
 #include <linux/of.h>
 #include <linux/version.h>
 #include <linux/of_gpio.h>
@@ -37,11 +37,21 @@ int wilc_of_parse_power_pins(struct wilc *wilc)
 			!gpio_is_valid(power->gpios.reset))
 		return -EINVAL;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+	ret = devm_gpio_request_one(wilc->dev, power->gpios.chip_en, GPIOF_IN,
+				    "CHIP_EN");
+#else
 	ret = devm_gpio_request(wilc->dev, power->gpios.chip_en, "CHIP_EN");
+#endif
 	if (ret)
 		return ret;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0))
+	ret = devm_gpio_request_one(wilc->dev, power->gpios.reset, GPIOF_IN,
+				    "RESET");
+#else 
 	ret = devm_gpio_request(wilc->dev, power->gpios.reset, "RESET");
+#endif
 	return ret;
 }
 
