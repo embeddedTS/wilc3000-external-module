@@ -37,11 +37,13 @@ int wilc_of_parse_power_pins(struct wilc *wilc)
 			!gpio_is_valid(power->gpios.reset))
 		return -EINVAL;
 
-	ret = devm_gpio_request(wilc->dev, power->gpios.chip_en, "CHIP_EN");
+	ret = devm_gpio_request_one(wilc->dev, power->gpios.chip_en,
+				    GPIOF_OUT_INIT_LOW, "CHIP_EN");
 	if (ret)
 		return ret;
 
-	ret = devm_gpio_request(wilc->dev, power->gpios.reset, "RESET");
+	ret = devm_gpio_request_one(wilc->dev, power->gpios.reset,
+				     GPIOF_OUT_INIT_HIGH, "RESET");
 	return ret;
 }
 
