@@ -778,7 +778,7 @@ static inline void host_int_parse_assoc_resp_info(struct wilc_vif *vif,
 		}
 	}
 
-	del_timer(&hif_drv->connect_timer);
+	timer_delete(&hif_drv->connect_timer);
 	conn_info->conn_result(CONN_DISCONN_EVENT_CONN_RESP, mac_status,
 			       hif_drv->conn_info.arg);
 
@@ -813,7 +813,7 @@ void wilc_handle_disconnect(struct wilc_vif *vif)
 	if (hif_drv->usr_scan_req.scan_result) {
 		PRINT_INFO(vif->ndev, HOSTINF_DBG,
 			   "\n\n<< Abort the running OBSS Scan >>\n\n");
-		del_timer(&hif_drv->scan_timer);
+		timer_delete(&hif_drv->scan_timer);
 		handle_scan_done(vif, SCAN_EVENT_ABORTED);
 	}
 
@@ -867,7 +867,7 @@ static void handle_rcvd_gnrl_async_info(struct work_struct *work)
 		} else if (hif_drv->usr_scan_req.scan_result) {
 			PRINT_WRN(vif->ndev, HOSTINF_DBG,
 				  "Received WILC_MAC_STATUS_DISCONNECTED. Abort the running Scan");
-			del_timer(&hif_drv->scan_timer);
+			timer_delete(&hif_drv->scan_timer);
 			handle_scan_done(vif, SCAN_EVENT_ABORTED);
 		}
 	}
@@ -900,7 +900,7 @@ int wilc_disconnect(struct wilc_vif *vif)
 			PRINT_INFO(vif_tmp->ndev, GENERIC_DBG,
 				   "Abort scan from disconnect. state [%d]\n",
 				   hif_drv_tmp->hif_state);
-			del_timer(&hif_drv_tmp->scan_timer);
+			timer_delete(&hif_drv_tmp->scan_timer);
 			handle_scan_done(vif_tmp, SCAN_EVENT_ABORTED);
 		}
 	}
@@ -923,7 +923,7 @@ int wilc_disconnect(struct wilc_vif *vif)
 	conn_info = &hif_drv->conn_info;
 
 	if (scan_req->scan_result) {
-		del_timer(&hif_drv->scan_timer);
+		timer_delete(&hif_drv->scan_timer);
 		scan_req->scan_result(SCAN_EVENT_ABORTED, NULL, scan_req->arg);
 		scan_req->scan_result = NULL;
 	}
@@ -931,7 +931,7 @@ int wilc_disconnect(struct wilc_vif *vif)
 	if (conn_info->conn_result) {
 		if (hif_drv->hif_state == HOST_IF_WAITING_CONN_RESP ||
 		    hif_drv->hif_state == HOST_IF_EXTERNAL_AUTH) {
-			del_timer(&hif_drv->connect_timer);
+			timer_delete(&hif_drv->connect_timer);
 			conn_info->conn_result(CONN_DISCONN_EVENT_CONN_RESP,
 					       WILC_MAC_STATUS_DISCONNECTED,
 					       conn_info->arg);
@@ -1190,13 +1190,13 @@ static void wilc_handle_listen_state_expired(struct work_struct *work)
 
 static void listen_timer_cb(struct timer_list *t)
 {
-	struct host_if_drv *hif_drv = from_timer(hif_drv, t,
+	struct host_if_drv *hif_drv = timer_container_of(hif_drv, t,
 						      remain_on_ch_timer);
 	struct wilc_vif *vif = hif_drv->remain_on_ch_timer_vif;
 	int result;
 	struct host_if_msg *msg;
 
-	del_timer(&vif->hif_drv->remain_on_ch_timer);
+	timer_delete(&vif->hif_drv->remain_on_ch_timer);
 
 	msg = wilc_alloc_work(vif, wilc_handle_listen_state_expired, false);
 	if (IS_ERR(msg))
@@ -1309,7 +1309,7 @@ static void handle_scan_complete(struct work_struct *work)
 {
 	struct host_if_msg *msg = container_of(work, struct host_if_msg, work);
 
-	del_timer(&msg->vif->hif_drv->scan_timer);
+	timer_delete(&msg->vif->hif_drv->scan_timer);
 	PRINT_INFO(msg->vif->ndev, HOSTINF_DBG, "scan completed\n");
 
 	handle_scan_done(msg->vif, SCAN_EVENT_DONE);
@@ -1319,7 +1319,7 @@ static void handle_scan_complete(struct work_struct *work)
 
 static void timer_scan_cb(struct timer_list *t)
 {
-	struct host_if_drv *hif_drv = from_timer(hif_drv, t, scan_timer);
+	struct host_if_drv *hif_drv = timer_container_of(hif_drv, t, scan_timer);
 	struct wilc_vif *vif = hif_drv->scan_timer_vif;
 	struct host_if_msg *msg;
 	int result;
@@ -1335,7 +1335,7 @@ static void timer_scan_cb(struct timer_list *t)
 
 static void timer_connect_cb(struct timer_list *t)
 {
-	struct host_if_drv *hif_drv = from_timer(hif_drv, t,
+	struct host_if_drv *hif_drv = timer_container_of(hif_drv, t,
 						      connect_timer);
 	struct wilc_vif *vif = hif_drv->connect_timer_vif;
 	struct host_if_msg *msg;
@@ -1790,7 +1790,7 @@ int wilc_hif_set_cfg(struct wilc_vif *vif, struct cfg_param_attr *param)
 
 static void get_periodic_rssi(struct timer_list *t)
 {
-	struct wilc_vif *vif = from_timer(vif, t, periodic_rssi);
+	struct wilc_vif *vif = timer_container_of(vif, t, periodic_rssi);
 
 	if (!vif->hif_drv) {
 		netdev_err(vif->ndev, "%s: hif driver is NULL", __func__);
@@ -1842,10 +1842,10 @@ int wilc_deinit(struct wilc_vif *vif)
 
 	mutex_lock(&vif->wilc->deinit_lock);
 
-	del_timer_sync(&hif_drv->scan_timer);
-	del_timer_sync(&hif_drv->connect_timer);
-	del_timer_sync(&vif->periodic_rssi);
-	del_timer_sync(&hif_drv->remain_on_ch_timer);
+	timer_delete_sync(&hif_drv->scan_timer);
+	timer_delete_sync(&hif_drv->connect_timer);
+	timer_delete_sync(&vif->periodic_rssi);
+	timer_delete_sync(&hif_drv->remain_on_ch_timer);
 
 	if (hif_drv->usr_scan_req.scan_result) {
 		hif_drv->usr_scan_req.scan_result(SCAN_EVENT_ABORTED, NULL,
@@ -2025,7 +2025,7 @@ int wilc_listen_state_expired(struct wilc_vif *vif, u64 cookie)
 		return -EFAULT;
 	}
 
-	del_timer(&vif->hif_drv->remain_on_ch_timer);
+	timer_delete(&vif->hif_drv->remain_on_ch_timer);
 
 	return wilc_handle_roc_expired(vif, cookie);
 }

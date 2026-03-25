@@ -259,6 +259,7 @@ struct wilc_vif *wilc_get_wl_to_vif(struct wilc *wl)
 }
 
 static int set_channel(struct wiphy *wiphy,
+		       struct net_device *netdev,
 		       struct cfg80211_chan_def *chandef)
 {
 	struct wilc *wl = wiphy_priv(wiphy);
@@ -912,7 +913,7 @@ static int change_bss(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
-static int set_wiphy_params(struct wiphy *wiphy, u32 changed)
+static int set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
 {
 	int ret = -EINVAL;
 	struct cfg_param_attr cfg_param_val;
@@ -2008,6 +2009,7 @@ static void wilc_set_wakeup(struct wiphy *wiphy, bool enabled)
 }
 
 static int set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+			int radio_idx,
 			enum nl80211_tx_power_setting type, int mbm)
 {
 	int ret;
@@ -2040,6 +2042,7 @@ static int set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 }
 
 static int get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+			int radio_idx, unsigned int link_id,
 			int *dbm)
 {
 	int ret;
@@ -2059,7 +2062,7 @@ static int get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return ret;
 }
 
-static int set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
+static int set_antenna(struct wiphy *wiphy, int radio_idx, u32 tx_ant, u32 rx_ant)
 {
 	int ret;
 	struct wilc *wl = wiphy_priv(wiphy);
@@ -2315,7 +2318,7 @@ void wilc_deinit_host_int(struct net_device *net)
 	mutex_destroy(&priv->scan_req_lock);
 	ret = wilc_deinit(vif);
 
-	del_timer_sync(&priv->eap_buff_timer);
+	timer_delete_sync(&priv->eap_buff_timer);
 
 	if (ret)
 		netdev_err(net, "Error while deinitializing host interface\n");

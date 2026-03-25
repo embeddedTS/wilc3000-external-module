@@ -118,7 +118,7 @@ static int debug_thread(void *arg)
 				if (hif_drv->usr_scan_req.scan_result) {
 					PRINT_INFO(vif->ndev, GENERIC_DBG,
 						   "Abort the running OBSS Scan\n");
-					del_timer(&hif_drv->scan_timer);
+					timer_delete(&hif_drv->scan_timer);
 					handle_scan_done(vif,
 							 SCAN_EVENT_ABORTED);
 				}
@@ -260,7 +260,7 @@ void eap_buff_timeout(struct timer_list *t)
 	u8 *assoc_bss;
 	static u8 timeout = 5;
 	int status = -1;
-	struct wilc_priv *priv = from_timer(priv, t, eap_buff_timer);
+	struct wilc_priv *priv = timer_container_of(priv, t, eap_buff_timer);
 	struct wilc_vif *vif = netdev_priv(priv->dev);
 
 	assoc_bss = priv->associated_bss;
@@ -269,7 +269,7 @@ void eap_buff_timeout(struct timer_list *t)
 			  (jiffies + msecs_to_jiffies(10)));
 		return;
 	}
-	del_timer(&priv->eap_buff_timer);
+	timer_delete(&priv->eap_buff_timer);
 	timeout = 5;
 
 	status = wilc_send_buffered_eap(vif, wilc_frmw_to_host,
